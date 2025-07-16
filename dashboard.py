@@ -18,7 +18,7 @@ model_choice = st.sidebar.radio("Choose Forecasting Model", ("ARIMA", "Random Fo
 
 if st.sidebar.button("🔄 Run Forecast"):
     with st.spinner("Fetching data and building forecast..."):
-        fetch_stock_data(ticker, start_date=start_date, end_date=end_date)
+        fetch_stock_data(ticker, start_date=start_date, end_date=end_date, interval='1d')
         df = load_data_from_csv()
 
         with st.expander("🗃 Raw Data"):
