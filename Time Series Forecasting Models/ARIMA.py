@@ -27,7 +27,7 @@ for col in target_columns:
             arima_forecast_df[f'{col}_arima'] = [None] * forecast_horizon
             continue
 
-        model = ARIMA(series, order=(1, 1, 1))
+        model = ARIMA(series, order=(5, 1, 0))
         model_fit = model.fit()
         forecast = model_fit.forecast(steps=forecast_horizon)
 
