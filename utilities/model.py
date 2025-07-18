@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from statsmodels.tsa.arima.model import ARIMA
 
-def arima_forecast(df, order=(5, 1, 0), steps=30):
+def arima_forecast(df, order=(5, 1, 1), steps=30):
     model = ARIMA(df['Close'], order=order)
     model_fit = model.fit()
     forecast = model_fit.forecast(steps=steps)
