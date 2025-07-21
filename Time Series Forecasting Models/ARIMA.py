@@ -1,41 +1,38 @@
 import pandas as pd
-import numpy as np
-from statsmodels.tsa.arima.model import ARIMA
-import warnings
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import pmdarima as pm
 
-warnings.filterwarnings("ignore")
-
-# Load data
-df = pd.read_csv("Data.csv")
-df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-df = df.dropna(subset=['Date'])
+df = pd.read_csv('Data.csv', skiprows=[1])
+df = df.dropna(subset=['Date', 'Close'])
+df['Date'] = pd.to_datetime(df['Date'], format='%d-%m-%Y')
 df = df.sort_values('Date')
-df.set_index('Date', inplace=True)
 
-target_columns = df.columns.tolist()
-forecast_horizon = 7
-arima_forecast_df = pd.DataFrame()
-arima_forecast_df['Date'] = pd.date_range(start=df.index.max() + pd.Timedelta(days=1), periods=forecast_horizon)
+input_date_str = input("Enter the forecast start date (dd-mm-yyyy): ")
+input_date = datetime.strptime(input_date_str, "%d-%m-%Y")
 
-# Loop and forecast
-for col in target_columns:
-    try:
-        series = pd.to_numeric(df[col], errors='coerce').dropna()
+filtered_df = df[df['Date'] <= input_date]
+if len(filtered_df) < 30:
+    print("❌ ARIMA requires at least 30 data points.")
+    exit()
 
-        if len(series) < 10:
-            print(f"⚠️ Skipped (too little data): {col}")
-            arima_forecast_df[f'{col}_arima'] = [None] * forecast_horizon
-            continue
+series = filtered_df.set_index('Date')['Close']
 
-        model = ARIMA(series, order=(5, 1, 0))
-        model_fit = model.fit()
-        forecast = model_fit.forecast(steps=forecast_horizon)
+model = pm.auto_arima(series, seasonal=False, stepwise=True, suppress_warnings=True)
+forecast = model.predict(n_periods=7)
 
-        arima_forecast_df[f'{col}_arima'] = forecast.values
+forecast_dates = [input_date + timedelta(days=i+1) for i in range(7)]
+forecast_df = pd.DataFrame({'Date': [d.strftime('%d-%m-%Y') for d in forecast_dates], 'Forecasted_Close': forecast})
 
-    except Exception as e:
-        print(f"❌ ARIMA error for {col}: {e}")
-        arima_forecast_df[f'{col}_arima'] = [None] * forecast_horizon
+output_file = f"arima_7day_forecast_from_{input_date.strftime('%d-%m-%Y')}.csv"
+forecast_df.to_csv(output_file, index=False)
+print(f"\n✅ ARIMA forecast saved to: {output_file}")
+print(forecast_df)
 
-arima_forecast_df.to_csv("arima_forecast.csv", index=False)
-print("✅ Saved ARIMA forecast to: arima_forecast.csv")
+plt.figure(figsize=(10,5))
+plt.plot(forecast_df['Date'], forecast_df['Forecasted_Close'], marker='o')
+plt.title(f"ARIMA 7-Day Forecast from {input_date.strftime('%d-%m-%Y')}")
+plt.xticks(rotation=45)
+plt.grid()
+plt.tight_layout()
+plt.show()
