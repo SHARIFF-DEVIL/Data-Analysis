@@ -16,12 +16,40 @@ def arima_forecast(df, order=(5, 1, 1), steps=30):
     return pd.Series(forecast.values, index=future_dates)
 
 # ---------------------- SARIMA (Manual Seasonal Order) ----------------------
-def sarima_forecast(df, order=(1,1,1), seasonal_order=(1,1,1,7), steps=30):
-    model = SARIMAX(df['Close'], order=order, seasonal_order=seasonal_order)
-    model_fit = model.fit(disp=False)
-    forecast = model_fit.forecast(steps=steps)
-    future_dates = pd.date_range(start=df.index[-1] + pd.Timedelta(days=1), periods=steps)
-    return pd.Series(forecast, index=future_dates)
+def sarima_forecast(df, order=(1, 1, 1), seasonal_order=(1, 1, 1, 7), steps=30):
+    df = df.copy()
+
+    # Ensure datetime index
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index, errors='coerce')
+
+    # Drop rows with invalid dates or close values
+    df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
+    df = df.dropna(subset=['Close'])
+    df = df.sort_index()
+
+    if len(df) < 50:
+        raise ValueError("Not enough data points for SARIMA. Minimum ~50 required.")
+
+    try:
+        model = SARIMAX(
+            df['Close'],
+            order=order,
+            seasonal_order=seasonal_order,
+            enforce_stationarity=False,
+            enforce_invertibility=False
+        )
+        model_fit = model.fit(disp=False)
+        forecast = model_fit.forecast(steps=steps)
+    except Exception as e:
+        print(f"❌ SARIMA model failed: {e}")
+        return pd.Series(dtype='float64')  # Return empty forecast on failure
+
+    # Generate future dates
+    future_dates = pd.date_range(start=df.index[-1] + pd.Timedelta(days=1), periods=steps, freq='D')
+    forecast_series = pd.Series(forecast, index=future_dates).dropna()
+
+    return forecast_series
 
 # ---------------------- Prophet ----------------------
 def prophet_forecast(df, steps=30):
