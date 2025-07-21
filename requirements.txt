@@ -8,3 +8,4 @@ statsmodels
 tensorflow
 prophet
 plotly
+prophet
