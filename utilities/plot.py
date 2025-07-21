@@ -11,13 +11,17 @@ def plot_time_series(df):
     return fig
 
 def plot_forecast(df, forecast_series, title="Forecast"):
-    fig, ax = plt.subplots(figsize=(12, 5))
+    import matplotlib.pyplot as plt
+
+    if forecast_series.empty:
+        raise ValueError("Forecast series is empty. Cannot plot.")
+
+    fig, ax = plt.subplots(figsize=(10, 6))
     forecast_series.plot(ax=ax, color='orange', label='Forecast')
     ax.set_title(title)
     ax.set_xlabel("Date")
-    ax.set_ylabel("Predicted Close Price")
+    ax.set_ylabel("Price")
     ax.legend()
-    ax.grid(True)
     return fig
 
 def plot_decomposition(decomposition):

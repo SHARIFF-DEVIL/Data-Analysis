@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import datetime, date
 from utilities.data import fetch_stock_data, load_data_from_csv
 from utilities.analysis import decompose_series, check_stationarity, plot_acf_pacf
-from utilities.model import arima_forecast, sarima_forecast, prophet_forecast #, lstm_forecast
+from utilities.model import arima_forecast, sarima_forecast, prophet_forecast, lstm_forecast
 from utilities.plot import plot_time_series, plot_forecast, plot_decomposition
 import pandas as pd
 
@@ -55,11 +55,16 @@ if st.sidebar.button("🔄 Run Forecast"):
             forecast_series = sarima_forecast(df, steps=days_to_forecast)
         elif model_choice == "Prophet":
             forecast_series = prophet_forecast(df, steps=days_to_forecast)
-        # elif model_choice == "LSTM":
-        #     forecast_series = lstm_forecast(df, steps=days_to_forecast)
+        elif model_choice == "LSTM":
+            forecast_series = lstm_forecast(df, steps=days_to_forecast)
         else:
             st.error("Unsupported model selected.")
             st.stop()
 
-        st.pyplot(plot_forecast(df, forecast_series, title=f"{model_choice} Forecast"))
+        try:
+            fig = plot_forecast(df, forecast_series, title=f"{model_choice} Forecast")
+            st.pyplot(fig)
+        except ValueError as e:
+            st.error(f"⚠️ Plotting failed: {e}")
+
         st.success("✅ Forecast complete!")
