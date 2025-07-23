@@ -25,13 +25,22 @@ if st.sidebar.button("🔄 Run Forecast"):
         fetch_stock_data(ticker, start_date=start_date, end_date=end_date, interval='1d')
         df = load_data_from_csv()
 
-        # Clean data
         df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
         df = df.dropna(subset=['Close'])
-        df.index.name = 'Date' # Set the index name for clarity in the CSV
+        df.index.name = 'Date'
 
         with st.expander("🗃 Raw Data"):
             st.dataframe(df.tail())
+              
+        # Download button for original data
+        csv_original = df.to_csv(index=True)
+        st.download_button(
+            label="⬇️ Download Original Dataset",
+            data=csv_original,
+            file_name=f"{ticker}_historical_data_{date.today()}.csv",
+            mime='text/csv',
+            help="Download the complete historical data for further analysis"
+        )    
 
         st.subheader("📊 Historical Time Series")
         st.pyplot(plot_time_series(df))
@@ -68,19 +77,15 @@ if st.sidebar.button("🔄 Run Forecast"):
         except ValueError as e:
             st.error(f"⚠️ Plotting failed: {e}")
 
-        # --- Enhanced Download Feature Section ---
         st.subheader("⬇️ Download Forecast Data")
         
-        # Ensure forecast_series is a DataFrame with a descriptive column name
         if isinstance(forecast_series, pd.Series):
             forecast_df = forecast_series.to_frame(name=f"{ticker}_Forecasted_Close")
         else:
-            forecast_df = forecast_series # Assuming it's already a DataFrame
+            forecast_df = forecast_series
         
-        # Generate a dynamic and informative filename
         forecast_filename = f"{ticker}_{model_choice}_forecast_{date.today()}.csv"
 
-        # Convert DataFrame to CSV, including the date index
         csv = forecast_df.to_csv(index=True)
         
         st.download_button(
@@ -89,6 +94,19 @@ if st.sidebar.button("🔄 Run Forecast"):
             file_name=forecast_filename,
             mime='text/csv'
         )
-        # --- End of Enhanced Section ---
 
         st.success("✅ Forecast complete!")
+        
+        # Add styled footer after forecast completion
+        st.markdown("---")
+        st.markdown("""
+        ## Developed by Group 26
+
+        ### Team Members
+        1. Rohit Kumar
+        2. Mohammed Shabar
+        3. Anupam Kanoongo
+        4. Nupur Agarwal
+        5. Nilambar Elangbam
+        6. Patlolla Hari Haran Reddy
+        """)
