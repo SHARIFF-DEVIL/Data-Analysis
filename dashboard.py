@@ -31,6 +31,15 @@ if st.sidebar.button("🔄 Run Forecast"):
 
         with st.expander("🗃 Raw Data"):
             st.dataframe(df.tail())
+              
+        csv_original = df.to_csv(index=True)
+        st.download_button(
+            label="⬇️ Download Original Dataset",
+            data=csv_original,
+            file_name=f"{ticker}_historical_data_{date.today()}.csv",
+            mime='text/csv',
+            help="Download the complete historical data."
+        )    
 
         st.subheader("📊 Historical Time Series")
         st.pyplot(plot_time_series(df))
@@ -82,7 +91,21 @@ if st.sidebar.button("🔄 Run Forecast"):
             label="Download Forecasted Series as CSV",
             data=csv,
             file_name=forecast_filename,
-            mime='text/csv'
+            mime='text/csv',
+            help="Download the forecasted stock prices."
         )
 
         st.success("✅ Forecast complete!")
+        
+        st.markdown("---")
+        st.markdown("""
+        ## Developed by Group 26
+
+        ### Team Members
+        1. Rohit Kumar
+        2. Mohammed Shabar
+        3. Anupam Kanoongo
+        4. Nupur Agarwal
+        5. Nilambar Elangbam
+        6. Patlolla Hari Haran Reddy
+        """)
