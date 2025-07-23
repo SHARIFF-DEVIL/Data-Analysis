@@ -21,26 +21,27 @@ def arima_forecast(df, order=(5, 1, 1), steps=7):
     return pd.Series(forecast.values, index=future_dates)
 
 # ---------------------- SARIMA (Manual Seasonal Order) ----------------------
-def sarima_forecast(df, order=(1, 1, 1), seasonal_order=(1, 1, 1, 7), steps=7):
+def sarima_forecast(df, order=(1, 1, 0), seasonal_order=(1, 0, 1, 7), steps=14):
+    import pandas as pd
+    from statsmodels.tsa.statespace.sarimax import SARIMAX
+    import warnings
+    warnings.filterwarnings("ignore")
+
     df = df.copy()
 
-    # Ensure DatetimeIndex
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index, errors='coerce')
         df = df.dropna(subset=['Close'])
 
-    # Set frequency explicitly
-    df = df.asfreq('D', fill_value=df['Close'].mean())
+    df = df.asfreq('D')
     df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
-    df = df.sort_index()
+    df = df.sort_index().dropna()
 
-    # Check for sufficient data
     if len(df) < 50:
         print("❌ Not enough data for SARIMA (minimum 50 observations required).")
         return pd.Series(dtype='float64')
 
     try:
-        # Fit SARIMA model
         model = SARIMAX(
             df['Close'],
             order=order,
@@ -48,33 +49,19 @@ def sarima_forecast(df, order=(1, 1, 1), seasonal_order=(1, 1, 1, 7), steps=7):
             enforce_stationarity=False,
             enforce_invertibility=False
         )
-        model_fit = model.fit(disp=False, maxiter=200)
+        model_fit = model.fit(disp=False)
 
-        # Check model convergence
         if not model_fit.mle_retvals['converged']:
-            print("⚠️ SARIMA model did not converge properly. Consider adjusting parameters.")
-        
-        # Generate forecast
-        forecast_result = model_fit.get_forecast(steps=steps)
-        forecast_values = forecast_result.predicted_mean
-        forecast_ci = forecast_result.conf_int()
+            print("⚠️ Model did not converge. Try changing parameters.")
 
-        # Create future dates
-        future_dates = pd.date_range(start=df.index[-1] + pd.Timedelta(days=1), periods=steps, freq='D')
-        
-        # Combine forecast and confidence intervals into a DataFrame
-        forecast_df = pd.DataFrame({
-            'Forecast': forecast_values,
-            'Lower CI': forecast_ci.iloc[:, 0],
-            'Upper CI': forecast_ci.iloc[:, 1]
-        }, index=future_dates)
+        forecast = model_fit.get_forecast(steps=steps)
+        forecast_mean = forecast.predicted_mean
+        forecast_index = pd.date_range(df.index[-1] + pd.Timedelta(days=1), periods=steps)
 
-        # Print model diagnostics
-        print(f"✅ SARIMA model summary:\n{model_fit.summary().tables[0]}")
-        return forecast_df['Forecast']
+        return pd.Series(forecast_mean.values, index=forecast_index, name='Forecast')
 
     except Exception as e:
-        print(f"❌ SARIMA model failed: {e}")
+        print(f"❌ SARIMA failed: {e}")
         return pd.Series(dtype='float64')
 
 # ---------------------- Prophet ----------------------
