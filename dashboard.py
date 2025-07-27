@@ -73,7 +73,22 @@ st.sidebar.header("Settings")
 ticker = st.sidebar.text_input("Enter stock ticker", value="AAPL")
 start_date = st.sidebar.date_input("Start Date", value=datetime(2010, 1, 1).date())
 end_date = st.sidebar.date_input("End Date", value=date.today(), max_value=date.today())
-days_to_forecast = st.sidebar.slider("Forecast Days", min_value=10, max_value=100, value=30)
+# Forecast Days Input Section
+st.sidebar.markdown("### Forecast Days")
+col1, col2 = st.sidebar.columns([2, 1])
+
+with col1:
+    days_to_forecast = st.number_input(
+        "Enter days",
+        min_value=1,
+        max_value=100,
+        value=30,
+        step=1,
+        label_visibility="collapsed"
+    )
+
+
+st.sidebar.markdown("---")
 model_choice = st.sidebar.radio(
     "Choose Forecasting Model",
     ("ARIMA", "SARIMA", "Prophet", "LSTM")
