@@ -88,9 +88,10 @@ if st.sidebar.button("Run Forecast"):
         df.index.name = 'Date'
 
         tab1, tab2, tab3 = st.tabs([
+            "Forecast Section",
             "Historical Time Series",
-            "Time Series Decomposition",
-            "Forecast Section"
+            "Time Series Analysis"
+            
         ])
 
         with tab2:
@@ -116,9 +117,31 @@ if st.sidebar.button("Run Forecast"):
             fig2 = plotly_decomposition(decomposition)
             st.plotly_chart(fig2, use_container_width=True)
 
-            st.subheader("ADF Test (Stationarity Check)")
+            st.subheader("📉 ADF Test (Stationarity Check)")
             adf_result = check_stationarity(df['Close'])
-            st.write(adf_result)
+            
+            # Format ADF test results in a more readable way
+            st.markdown("### Results:")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("ADF Statistic", f"{adf_result['ADF Statistic']:.4f}")
+                st.metric("p-value", f"{adf_result['p-value']:.4f}")
+            
+            st.markdown("### Critical Values:")
+            cols = st.columns(3)
+            with cols[0]:
+                st.metric("1%", f"{adf_result['Critical Values']['1%']:.4f}")
+            with cols[1]:
+                st.metric("5%", f"{adf_result['Critical Values']['5%']:.4f}")
+            with cols[2]:
+                st.metric("10%", f"{adf_result['Critical Values']['10%']:.4f}")
+            
+            # Add interpretation
+            st.markdown("#### Interpretation:")
+            if adf_result['p-value'] > 0.05:
+                st.warning("❗ The series is **non-stationary** (p-value > 0.05)")
+            else:
+                st.success("✅ The series is **stationary** (p-value ≤ 0.05)")
 
             st.subheader("ACF & PACF Plots")
             from statsmodels.graphics.tsaplots import acf, pacf
