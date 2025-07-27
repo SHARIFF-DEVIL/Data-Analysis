@@ -1,94 +1,203 @@
+
 import streamlit as st
 from datetime import datetime, date
 from utilities.data import fetch_stock_data, load_data_from_csv
 from utilities.analysis import decompose_series, check_stationarity, plot_acf_pacf
 from utilities.model import arima_forecast, sarima_forecast, prophet_forecast, lstm_forecast
-from utilities.plot import plot_time_series, plot_forecast, plot_decomposition
 import pandas as pd
+import numpy as np
+import plotly.graph_objs as go
 
-st.set_page_config(page_title="📈 Stock Forecasting App", layout="wide")
-st.title("📈 Stock Price Forecasting App")
+# --- Plotly plotting functions ---
+def plotly_time_series(df):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name='Close'))
+    fig.update_layout(title='Historical Time Series', xaxis_title='Date', yaxis_title='Close Price')
+    return fig
 
-st.sidebar.header("⚙️ Settings")
+def plotly_decomposition(decomposition):
+    import plotly.subplots as sp
+    fig = sp.make_subplots(rows=4, cols=1, shared_xaxes=True, subplot_titles=['Observed', 'Trend', 'Seasonal', 'Residual'])
+    fig.add_trace(go.Scatter(x=decomposition.observed.index, y=decomposition.observed, name='Observed'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=decomposition.trend.index, y=decomposition.trend, name='Trend'), row=2, col=1)
+    fig.add_trace(go.Scatter(x=decomposition.seasonal.index, y=decomposition.seasonal, name='Seasonal'), row=3, col=1)
+    fig.add_trace(go.Scatter(x=decomposition.resid.index, y=decomposition.resid, name='Residual'), row=4, col=1)
+    fig.update_layout(height=900, showlegend=False, title='Time Series Decomposition')
+    return fig
+
+def plotly_acf_pacf(acf_vals, pacf_vals, lags):
+    import plotly.subplots as sp
+    fig = sp.make_subplots(rows=1, cols=2, subplot_titles=['ACF', 'PACF'])
+    fig.add_trace(go.Bar(x=list(range(lags)), y=acf_vals, name='ACF'), row=1, col=1)
+    fig.add_trace(go.Bar(x=list(range(lags)), y=pacf_vals, name='PACF'), row=1, col=2)
+    fig.update_layout(title='ACF & PACF Plots')
+    return fig
+
+
+
+def plotly_ohlc_lines(forecast_df, title="Forecast (OHLC)"):
+    fig = go.Figure()
+    if all(col in forecast_df.columns for col in ['Open', 'High', 'Low', 'Close']):
+        fig.add_trace(go.Scatter(
+            x=forecast_df.index,
+            y=forecast_df['Close'],
+            mode='lines+markers',
+            name='Close',
+            customdata=np.stack([forecast_df['Open'], forecast_df['High'], forecast_df['Low'], forecast_df['Close']], axis=-1),
+            hovertemplate=
+                'Date: %{x}<br>' +
+                'Open: %{customdata[0]:.2f}<br>' +
+                'High: %{customdata[1]:.2f}<br>' +
+                'Low: %{customdata[2]:.2f}<br>' +
+                'Close: %{customdata[3]:.2f}<extra></extra>'
+        ))
+    else:
+        # fallback to Close only
+        close_col = forecast_df.columns[0] if forecast_df.shape[1] == 1 else 'Close'
+        fig.add_trace(go.Scatter(
+            x=forecast_df.index,
+            y=forecast_df[close_col],
+            mode='lines+markers',
+            name=close_col,
+            hovertemplate='Date: %{x}<br>'+f'{close_col}: '+'%{y:.2f}<extra></extra>'
+        ))
+    fig.update_layout(title=title, xaxis_title='Date', yaxis_title='Price')
+    return fig
+
+
+# Restore original Streamlit UI (sequential, no tabs)
+st.set_page_config(page_title="Stock Forecasting App")
+st.title("Stock Price Forecasting App")
+
+st.sidebar.header("Settings")
 ticker = st.sidebar.text_input("Enter stock ticker", value="AAPL")
 start_date = st.sidebar.date_input("Start Date", value=datetime(2010, 1, 1).date())
 end_date = st.sidebar.date_input("End Date", value=date.today(), max_value=date.today())
 days_to_forecast = st.sidebar.slider("Forecast Days", min_value=10, max_value=100, value=30)
-
 model_choice = st.sidebar.radio(
     "Choose Forecasting Model",
     ("ARIMA", "SARIMA", "Prophet", "LSTM")
 )
 
-if st.sidebar.button("🔄 Run Forecast"):
+if st.sidebar.button("Run Forecast"):
     with st.spinner("Fetching data and building forecast..."):
         fetch_stock_data(ticker, start_date=start_date, end_date=end_date, interval='1d')
         df = load_data_from_csv()
-
-        # Clean data
         df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
         df = df.dropna(subset=['Close'])
-        df.index.name = 'Date' # Set the index name for clarity in the CSV
+        df.index.name = 'Date'
 
-        with st.expander("🗃 Raw Data"):
+        tab1, tab2, tab3 = st.tabs([
+            "Historical Time Series",
+            "Time Series Decomposition",
+            "Forecast Section"
+        ])
+
+        with tab2:
+            st.subheader("Raw Data")
             st.dataframe(df.tail())
 
-        st.subheader("📊 Historical Time Series")
-        st.pyplot(plot_time_series(df))
+            csv_original = df.to_csv(index=True)
+            st.download_button(
+                label="Download Original Dataset",
+                data=csv_original,
+                file_name=f"{ticker}_historical_data_{date.today()}.csv",
+                mime='text/csv',
+                help="Download the complete historical data."
+            )
 
-        st.subheader("🧩 Time Series Decomposition")
-        decomposition = decompose_series(df)
-        st.pyplot(plot_decomposition(decomposition))
+            st.subheader("Historical Time Series")
+            fig1 = plotly_time_series(df)
+            st.plotly_chart(fig1, use_container_width=True)
 
-        st.subheader("📉 ADF Test (Stationarity Check)")
-        adf_result = check_stationarity(df['Close'])
-        st.write(adf_result)
+        with tab3:
+            st.subheader("Time Series Decomposition")
+            decomposition = decompose_series(df)
+            fig2 = plotly_decomposition(decomposition)
+            st.plotly_chart(fig2, use_container_width=True)
 
-        st.subheader("📐 ACF & PACF Plots")
-        acf_fig, pacf_fig = plot_acf_pacf(df['Close'])
-        st.pyplot(acf_fig)
-        st.pyplot(pacf_fig)
+            st.subheader("ADF Test (Stationarity Check)")
+            adf_result = check_stationarity(df['Close'])
+            st.write(adf_result)
 
-        st.subheader(f"🔮 {model_choice} Forecast - Next {days_to_forecast} Days")
-        if model_choice == "ARIMA":
-            forecast_series = arima_forecast(df, steps=days_to_forecast)
-        elif model_choice == "SARIMA":
-            forecast_series = sarima_forecast(df, steps=days_to_forecast)
-        elif model_choice == "Prophet":
-            forecast_series = prophet_forecast(df, steps=days_to_forecast)
-        elif model_choice == "LSTM":
-            forecast_series = lstm_forecast(df, steps=days_to_forecast)
-        else:
-            st.error("Unsupported model selected.")
-            st.stop()
+            st.subheader("ACF & PACF Plots")
+            from statsmodels.graphics.tsaplots import acf, pacf
+            lags = min(40, len(df['Close']) // 2)
+            acf_vals = acf(df['Close'], nlags=lags)
+            pacf_vals = pacf(df['Close'], nlags=lags)
+            acf_pacf_fig = plotly_acf_pacf(acf_vals, pacf_vals, lags+1)
+            st.plotly_chart(acf_pacf_fig, use_container_width=True)
 
-        try:
-            fig = plot_forecast(df, forecast_series, title=f"{model_choice} Forecast")
-            st.pyplot(fig)
-        except ValueError as e:
-            st.error(f"⚠️ Plotting failed: {e}")
+        with tab1:
+            st.subheader(f"{model_choice} Forecast - Next {days_to_forecast} Days")
+            if model_choice == "ARIMA":
+                forecast_series = arima_forecast(df, steps=days_to_forecast)
+            elif model_choice == "SARIMA":
+                forecast_series = sarima_forecast(df, steps=days_to_forecast)
+            elif model_choice == "Prophet":
+                forecast_series = prophet_forecast(df, steps=days_to_forecast)
+            elif model_choice == "LSTM":
+                forecast_series = lstm_forecast(df, steps=days_to_forecast)
+            else:
+                st.error("Unsupported model selected.")
+                st.stop()
 
-        # --- Enhanced Download Feature Section ---
-        st.subheader("⬇️ Download Forecast Data")
-        
-        # Ensure forecast_series is a DataFrame with a descriptive column name
-        if isinstance(forecast_series, pd.Series):
-            forecast_df = forecast_series.to_frame(name=f"{ticker}_Forecasted_Close")
-        else:
-            forecast_df = forecast_series # Assuming it's already a DataFrame
-        
-        # Generate a dynamic and informative filename
-        forecast_filename = f"{ticker}_{model_choice}_forecast_{date.today()}.csv"
+            # Prepare forecast_df with OHLC values
+            if isinstance(forecast_series, pd.Series):
+                # Create OHLC data based on the forecasted close price
+                # Using a simple volatility-based approach
+                close_values = forecast_series.values
+                volatility = 0.02  # 2% daily volatility assumption
+                
+                forecast_df = pd.DataFrame({
+                    'Close': close_values,
+                    'Open': close_values * (1 + np.random.normal(0, volatility, len(close_values))),
+                    'High': close_values * (1 + abs(np.random.normal(0, volatility, len(close_values)))),
+                    'Low': close_values * (1 - abs(np.random.normal(0, volatility, len(close_values))))
+                }, index=forecast_series.index)
+                
+                # Ensure High is the highest and Low is the lowest
+                forecast_df['High'] = forecast_df[['Open', 'Close', 'High']].max(axis=1)
+                forecast_df['Low'] = forecast_df[['Open', 'Close', 'Low']].min(axis=1)
+            else:
+                forecast_df = pd.DataFrame(forecast_series)
 
-        # Convert DataFrame to CSV, including the date index
-        csv = forecast_df.to_csv(index=True)
-        
-        st.download_button(
-            label="Download Forecasted Series as CSV",
-            data=csv,
-            file_name=forecast_filename,
-            mime='text/csv'
-        )
-        # --- End of Enhanced Section ---
+            # Reorder columns to standard OHLC order
+            if all(col in forecast_df.columns for col in ['Open', 'High', 'Low', 'Close']):
+                forecast_df = forecast_df[['Open', 'High', 'Low', 'Close']]
 
-        st.success("✅ Forecast complete!")
+            # Plot OHLC if available, else plot Close only (show graph before table)
+            try:
+                fig3 = plotly_ohlc_lines(forecast_df, title=f"{model_choice} Forecast (OHLC)")
+                st.plotly_chart(fig3, use_container_width=True)
+            except ValueError as e:
+                st.error(f"Plotting failed: {e}")
+
+            st.subheader("Forecasted Data Table")
+            st.dataframe(forecast_df)
+
+            st.subheader("Download Forecast Data")
+            # Use the same forecast_df that was displayed in the table (with OHLC values)
+            forecast_filename = f"{ticker}_{model_choice}_forecast_OHLC_{date.today()}.csv"
+            csv = forecast_df.to_csv(index=True)
+            st.download_button(
+                label="Download Forecasted Series as CSV",
+                data=csv,
+                file_name=forecast_filename,
+                mime='text/csv',
+                help="Download the forecasted stock prices."
+            )
+
+            st.success("Forecast complete!")
+            st.markdown("---")
+            st.markdown("""
+            ## Developed by Group 26
+
+            ### Team Members
+            1. Rohit Kumar
+            2. Mohammed Shabar
+            3. Anupam Kanoongo
+            4. Nupur Agarwal
+            5. Nilambar Elangbam
+            6. Patlolla Hari Haran Reddy
+            """)
