@@ -8,4 +8,7 @@ statsmodels
 tensorflow
 prophet
 plotly
-prophet
+seaborn
+scipy   
+pyrebase4
+python-dotenv
