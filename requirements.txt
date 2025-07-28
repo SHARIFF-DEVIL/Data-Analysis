@@ -11,4 +11,3 @@ plotly
 seaborn
 scipy   
 pyrebase4
-python-dotenv
