@@ -37,11 +37,13 @@ def login(auth_handler):
             try:
                 user = auth_handler.sign_in_with_email_and_password(email, password)
                 st.session_state['user'] = user
+                st.session_state['auth_action'] = 'login'
                 st.rerun()
-            except:
+            except Exception:
                 st.error("Login failed: Invalid email or password.")
         else:
             st.warning("Please enter both email and password.")
+
 
 def signup(auth_handler):
     st.subheader("Create a New Account")
@@ -50,38 +52,54 @@ def signup(auth_handler):
     confirm_password = st.text_input("Confirm Password", type="password", key="confirm_password")
 
     if st.button("Sign Up", key="signup_button"):
-        if not email or not password:
-            st.warning("Please fill out all fields.")
-        elif password != confirm_password:
+        if password != confirm_password:
             st.error("Passwords do not match.")
-        else:
+        elif email and password:
             try:
-                auth_handler.create_user_with_email_and_password(email, password)
-                st.success("Account created successfully! Please login.")
+                user = auth_handler.create_user_with_email_and_password(email, password)
+                st.session_state['signup_success'] = True
+                st.session_state['auth_action'] = 'login'  # Optional: switch to login view
                 st.rerun()
             except Exception as e:
                 st.error(f"Could not create account. Error: {e}")
+        else:
+            st.warning("Please fill out all fields.")
+
+# Show signup success message if set
+if st.session_state.get('signup_success'):
+    st.success("Account created successfully! Please log in.")
+    del st.session_state['signup_success']
+
+
 
 def logout():
     if st.button("Logout", key="logout_button"):
         st.session_state.pop('user', None)
+        st.session_state['auth_action'] = 'logout'
         st.rerun()
 
+
 # --- Main Authentication Logic ---
+
 
 if 'user' not in st.session_state:
     st.title("Welcome to the Stock Forecasting App")
     choice = st.selectbox("Login / Sign Up", ["Login", "Sign Up"])
-    login(auth) if choice == "Login" else signup(auth)
-    st.stop()
+    
+    if choice == "Login":
+        login(auth)
+    else:
+        signup(auth)
+        
+    st.stop()  # Stop the rest of the app from running
 else:
-    st.sidebar.subheader("Welcome!")
+    # If user is logged in, show a logout button at the top of the sidebar or main page
+    st.sidebar.subheader(f"Welcome!")
     with st.sidebar:
         logout()
-
+        
         
 # --- Main App Logic ---
-
 def plotly_time_series(df):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name='Close'))
