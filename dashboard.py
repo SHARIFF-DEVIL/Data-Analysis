@@ -62,8 +62,6 @@ def plotly_ohlc_lines(forecast_df, title="Forecast (OHLC)"):
     fig.update_layout(title=title, xaxis_title='Date', yaxis_title='Price')
     return fig
 
-
-# Restore original Streamlit UI (sequential, no tabs)
 st.set_page_config(page_title="Stock Forecasting App")
 st.title("Stock Price Forecasting App")
 
@@ -71,7 +69,7 @@ st.sidebar.header("Settings")
 ticker = st.sidebar.text_input("Enter stock ticker", value="AAPL")
 start_date = st.sidebar.date_input("Start Date", value=datetime(2010, 1, 1).date())
 end_date = st.sidebar.date_input("End Date", value=date.today(), max_value=date.today())
-# Forecast Days Input Section
+
 st.sidebar.markdown("### Forecast Days")
 col1, col2 = st.sidebar.columns([2, 1])
 
@@ -112,24 +110,14 @@ if st.sidebar.button("Run Forecast"):
             st.subheader("Raw Data")
             st.dataframe(df.tail())
               
-        csv_original = df.to_csv(index=True)
-        st.download_button(
-            label="⬇️ Download Original Dataset",
-            data=csv_original,
-            file_name=f"{ticker}_historical_data_{date.today()}.csv",
-            mime='text/csv',
-            help="Download the complete historical data."
-        )    
-
             csv_original = df.to_csv(index=True)
             st.download_button(
-                label="Download Original Dataset",
+                label="⬇️ Download Original Dataset",
                 data=csv_original,
                 file_name=f"{ticker}_historical_data_{date.today()}.csv",
                 mime='text/csv',
                 help="Download the complete historical data."
-            )
-
+            )    
             st.subheader("Historical Time Series")
             fig1 = plotly_time_series(df)
             st.plotly_chart(fig1, use_container_width=True)
