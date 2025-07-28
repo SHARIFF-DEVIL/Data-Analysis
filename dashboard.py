@@ -8,7 +8,6 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 
-# --- Plotly plotting functions ---
 def plotly_time_series(df):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name='Close'))
@@ -52,7 +51,6 @@ def plotly_ohlc_lines(forecast_df, title="Forecast (OHLC)"):
                 'Close: %{customdata[3]:.2f}<extra></extra>'
         ))
     else:
-        # fallback to Close only
         close_col = forecast_df.columns[0] if forecast_df.shape[1] == 1 else 'Close'
         fig.add_trace(go.Scatter(
             x=forecast_df.index,
@@ -98,6 +96,7 @@ if st.sidebar.button("Run Forecast"):
     with st.spinner("Fetching data and building forecast..."):
         fetch_stock_data(ticker, start_date=start_date, end_date=end_date, interval='1d')
         df = load_data_from_csv()
+        
         df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
         df = df.dropna(subset=['Close'])
         df.index.name = 'Date'
@@ -112,6 +111,15 @@ if st.sidebar.button("Run Forecast"):
         with tab2:
             st.subheader("Raw Data")
             st.dataframe(df.tail())
+              
+        csv_original = df.to_csv(index=True)
+        st.download_button(
+            label="⬇️ Download Original Dataset",
+            data=csv_original,
+            file_name=f"{ticker}_historical_data_{date.today()}.csv",
+            mime='text/csv',
+            help="Download the complete historical data."
+        )    
 
             csv_original = df.to_csv(index=True)
             st.download_button(
@@ -135,7 +143,6 @@ if st.sidebar.button("Run Forecast"):
             st.subheader("📉 ADF Test (Stationarity Check)")
             adf_result = check_stationarity(df['Close'])
             
-            # Format ADF test results in a more readable way
             st.markdown("### Results:")
             col1, col2 = st.columns(2)
             with col1:
@@ -150,8 +157,7 @@ if st.sidebar.button("Run Forecast"):
                 st.metric("5%", f"{adf_result['Critical Values']['5%']:.4f}")
             with cols[2]:
                 st.metric("10%", f"{adf_result['Critical Values']['10%']:.4f}")
-            
-            # Add interpretation
+
             st.markdown("#### Interpretation:")
             if adf_result['p-value'] > 0.05:
                 st.warning("❗ The series is **non-stationary** (p-value > 0.05)")
@@ -180,12 +186,9 @@ if st.sidebar.button("Run Forecast"):
                 st.error("Unsupported model selected.")
                 st.stop()
 
-            # Prepare forecast_df with OHLC values
             if isinstance(forecast_series, pd.Series):
-                # Create OHLC data based on the forecasted close price
-                # Using a simple volatility-based approach
                 close_values = forecast_series.values
-                volatility = 0.02  # 2% daily volatility assumption
+                volatility = 0.02
                 
                 forecast_df = pd.DataFrame({
                     'Close': close_values,
@@ -194,17 +197,14 @@ if st.sidebar.button("Run Forecast"):
                     'Low': close_values * (1 - abs(np.random.normal(0, volatility, len(close_values))))
                 }, index=forecast_series.index)
                 
-                # Ensure High is the highest and Low is the lowest
                 forecast_df['High'] = forecast_df[['Open', 'Close', 'High']].max(axis=1)
                 forecast_df['Low'] = forecast_df[['Open', 'Close', 'Low']].min(axis=1)
             else:
                 forecast_df = pd.DataFrame(forecast_series)
 
-            # Reorder columns to standard OHLC order
             if all(col in forecast_df.columns for col in ['Open', 'High', 'Low', 'Close']):
                 forecast_df = forecast_df[['Open', 'High', 'Low', 'Close']]
 
-            # Plot OHLC if available, else plot Close only (show graph before table)
             try:
                 fig3 = plotly_ohlc_lines(forecast_df, title=f"{model_choice} Forecast (OHLC)")
                 st.plotly_chart(fig3, use_container_width=True)
@@ -215,7 +215,7 @@ if st.sidebar.button("Run Forecast"):
             st.dataframe(forecast_df)
 
             st.subheader("Download Forecast Data")
-            # Use the same forecast_df that was displayed in the table (with OHLC values)
+
             forecast_filename = f"{ticker}_{model_choice}_forecast_OHLC_{date.today()}.csv"
             csv = forecast_df.to_csv(index=True)
             st.download_button(
