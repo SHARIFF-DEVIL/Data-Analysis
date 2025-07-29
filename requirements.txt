@@ -1,11 +1,13 @@
 streamlit
 yfinance
 pandas
-numpy
+numpy==1.23.5
 matplotlib
 scikit-learn
 statsmodels
-tensorflow
+tensorflow==2.13.0
 prophet
 plotly
-prophet
+seaborn
+scipy   
+pyrebase4

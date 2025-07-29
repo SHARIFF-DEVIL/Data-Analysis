@@ -8,6 +8,98 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
 
+
+# Sign Up and Login functionality using Firebase
+import pyrebase
+# Load Firebase config from Streamlit Secrets
+firebaseConfig = {
+    "apiKey": st.secrets["firebase"]["api_key"],
+    "authDomain": st.secrets["firebase"]["auth_domain"],
+    "projectId": st.secrets["firebase"]["project_id"],
+    "storageBucket": st.secrets["firebase"]["storage_bucket"],
+    "messagingSenderId": st.secrets["firebase"]["messaging_sender_id"],
+    "appId": st.secrets["firebase"]["app_id"],
+    "databaseURL": st.secrets["firebase"]["database_url"]
+}
+
+# Initialize Firebase
+firebase = pyrebase.initialize_app(firebaseConfig)
+auth = firebase.auth()
+
+# --- Authentication Functions ---
+
+def login(auth_handler):
+    st.subheader("Login")
+    email = st.text_input("Email", key="login_email")
+    password = st.text_input("Password", type="password", key="login_password")
+    if st.button("Login", key="login_button"):
+        if email and password:
+            try:
+                user = auth_handler.sign_in_with_email_and_password(email, password)
+                st.session_state['user'] = user
+                st.session_state['auth_action'] = 'login'
+                st.rerun()
+            except Exception:
+                st.error("Login failed: Invalid email or password.")
+        else:
+            st.warning("Please enter both email and password.")
+
+
+def signup(auth_handler):
+    st.subheader("Create a New Account")
+    email = st.text_input("Email", key="signup_email")
+    password = st.text_input("Password", type="password", key="signup_password")
+    confirm_password = st.text_input("Confirm Password", type="password", key="confirm_password")
+
+    if st.button("Sign Up", key="signup_button"):
+        if password != confirm_password:
+            st.error("Passwords do not match.")
+        elif email and password:
+            try:
+                user = auth_handler.create_user_with_email_and_password(email, password)
+                st.session_state['signup_success'] = True
+                st.session_state['auth_action'] = 'login'  # Optional: switch to login view
+                st.rerun()
+            except Exception as e:
+                st.error(f"Could not create account. Error: {e}")
+        else:
+            st.warning("Please fill out all fields.")
+
+# Show signup success message if set
+if st.session_state.get('signup_success'):
+    st.success("Account created successfully! Please log in.")
+    del st.session_state['signup_success']
+
+
+
+def logout():
+    if st.button("Logout", key="logout_button"):
+        st.session_state.pop('user', None)
+        st.session_state['auth_action'] = 'logout'
+        st.rerun()
+
+
+# --- Main Authentication Logic ---
+
+
+if 'user' not in st.session_state:
+    st.title("Welcome to the Stock Forecasting App")
+    choice = st.selectbox("Login / Sign Up", ["Login", "Sign Up"])
+    
+    if choice == "Login":
+        login(auth)
+    else:
+        signup(auth)
+        
+    st.stop()  # Stop the rest of the app from running
+else:
+    # If user is logged in, show a logout button at the top of the sidebar or main page
+    st.sidebar.subheader(f"Welcome!")
+    with st.sidebar:
+        logout()
+        
+        
+# --- Main App Logic ---
 def plotly_time_series(df):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', name='Close'))
