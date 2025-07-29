@@ -1,11 +1,11 @@
 streamlit
 yfinance
 pandas
-numpy==1.23.5
+numpy
 matplotlib
 scikit-learn
 statsmodels
-tensorflow==2.13.0
+tensorflow
 prophet
 plotly
 seaborn
